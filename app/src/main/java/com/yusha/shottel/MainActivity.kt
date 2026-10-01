@@ -5,8 +5,11 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -76,6 +79,7 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             ensureNotifPermission()
+            requestIgnoreBatteryOptimizations()
             val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             projectionLauncher.launch(mpm.createScreenCaptureIntent())
         }
@@ -86,6 +90,21 @@ class MainActivity : AppCompatActivity() {
             }
             startService(svc)
             status.text = "Stopped."
+        }
+    }
+
+    /** Ask the OS to exempt this app from battery optimization so the service survives. */
+    private fun requestIgnoreBatteryOptimizations() {
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+            try {
+                startActivity(
+                    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                        .setData(Uri.parse("package:$packageName"))
+                )
+            } catch (_: Exception) {
+                // Some OEMs block this intent; the user can set it manually in Settings.
+            }
         }
     }
 

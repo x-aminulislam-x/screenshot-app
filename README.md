@@ -64,6 +64,24 @@ Or copy the APK to the phone and tap it (allow "install from unknown sources").
 3. Tap **Save**, then **Start**, and approve the capture prompt.
 4. Screenshots arrive in your Telegram chat on the interval. Tap **Stop** to end.
 
+## Keeping it running when the app is closed
+
+The capture runs in a **foreground service**, so it keeps going when you leave or
+close the app — the app does not need to be open. To make it survive aggressively:
+
+- On **Start**, the app asks to be **exempted from battery optimization** — tap
+  **Allow**. This is the most important step.
+- On phones with extra power managers (Xiaomi/MIUI, Samsung, Oppo/Realme/Vivo,
+  Huawei), also turn on **Autostart** for this app and set its battery usage to
+  **Unrestricted / No restrictions** in system Settings. These OEM killers are the
+  usual reason a background service dies.
+
+**Hard limit:** if Android fully kills the process (low memory, or some OEMs on
+swipe-from-Recents), the screen-capture grant is lost and **cannot** be restored
+silently — Android requires a fresh consent tap. When that happens the app shows a
+"Capture was interrupted. Tap to resume." notification; tap it and press Start
+again. No app can bypass this; it is a platform privacy rule.
+
 ## Notes & limits
 
 - `minSdk 29` (Android 10) and up.

@@ -3,6 +3,7 @@ package com.yusha.shottel
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -86,8 +87,20 @@ class CaptureService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_START -> startCapture(intent)
+            else -> {
+                // Restarted by the system after a kill (START_STICKY redelivers a null
+                // intent). The MediaProjection grant cannot be restored silently, so we
+                // stay in the foreground and ask the user to tap to resume.
+                startForeground(NOTIF_ID, buildResumeNotification())
+            }
         }
         return START_STICKY
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        // User swiped the app from Recents. Keep the capture service alive instead of
+        // letting the task removal tear it down.
+        super.onTaskRemoved(rootIntent)
     }
 
     private fun startCapture(intent: Intent) {
@@ -247,5 +260,23 @@ class CaptureService : Service() {
     private fun updateNotification(text: String) {
         val nm = getSystemService(NotificationManager::class.java)
         nm.notify(NOTIF_ID, buildNotification(text))
+    }
+
+    /** Shown after a system kill/restart, when the capture grant must be re-approved. */
+    private fun buildResumeNotification(): Notification {
+        val openIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pi = PendingIntent.getActivity(
+            this, 0, openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return Notification.Builder(this, CHANNEL_ID)
+            .setContentTitle("Screenshot → Telegram")
+            .setContentText("Capture was interrupted. Tap to resume.")
+            .setSmallIcon(android.R.drawable.ic_menu_camera)
+            .setContentIntent(pi)
+            .setOngoing(true)
+            .build()
     }
 }
