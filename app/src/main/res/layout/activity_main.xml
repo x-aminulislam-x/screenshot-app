@@ -11,11 +11,11 @@
         android:layout_gravity="center"
         android:background="@drawable/btn_circle"
         android:backgroundTint="#2E7D32"
+        android:foreground="@drawable/ripple_oval"
         android:text="START"
         android:textColor="#FFFFFF"
         android:textSize="30sp"
         android:textStyle="bold"
-        android:stateListAnimator="@null"
         android:elevation="8dp" />
 
 </FrameLayout>

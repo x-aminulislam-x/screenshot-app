@@ -15,8 +15,31 @@ android {
         versionName = "1.0"
     }
 
+    // Fixed signing key so every build can update the previous install in place.
+    // The keystore and password are supplied at build time (CI secrets / local file),
+    // never committed. If absent, the build falls back to the default debug key.
+    val keystore = file("kulumbi.p12")
+    val ksPass = System.getenv("KS_PASS")
+    val hasFixedKey = keystore.exists() && !ksPass.isNullOrBlank()
+
+    signingConfigs {
+        if (hasFixedKey) {
+            create("fixed") {
+                storeFile = keystore
+                storePassword = ksPass
+                keyAlias = "kulumbi"
+                keyPassword = ksPass
+                storeType = "PKCS12"
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            if (hasFixedKey) signingConfig = signingConfigs.getByName("fixed")
+        }
         release {
+            if (hasFixedKey) signingConfig = signingConfigs.getByName("fixed")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

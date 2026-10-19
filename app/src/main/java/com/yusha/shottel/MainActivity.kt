@@ -93,6 +93,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startCapture() {
+        toggle.text = "…"
         ensureNotifPermission()
         requestIgnoreBatteryOptimizations()
         val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
@@ -100,6 +101,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun stopCapture() {
+        toggle.text = "…"
         startService(Intent(this, CaptureService::class.java).apply {
             action = CaptureService.ACTION_STOP
         })
