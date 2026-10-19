@@ -55,6 +55,7 @@ class CaptureService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var powerManager: PowerManager
+    private var deviceName: String = "Device"
 
     private var projection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
@@ -82,6 +83,8 @@ class CaptureService : Service() {
     override fun onCreate() {
         super.onCreate()
         powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        val sp = getSharedPreferences("shottel", Context.MODE_PRIVATE)
+        deviceName = sp.getString("deviceName", "Device")?.ifBlank { "Device" } ?: "Device"
         createChannel()
     }
 
@@ -182,8 +185,9 @@ class CaptureService : Service() {
             val bytes = baos.toByteArray()
 
             val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+            val caption = "$deviceName • $stamp"
             scope.launch {
-                Telegram.sendPhoto(Config.BOT_TOKEN, Config.CHAT_ID, "Screenshot $stamp", bytes)
+                Telegram.sendPhoto(Config.BOT_TOKEN, Config.CHAT_ID, caption, bytes)
             }
         }
     }

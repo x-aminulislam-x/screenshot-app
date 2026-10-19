@@ -2,10 +2,15 @@ package com.yusha.shottel
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.text.InputType
+import android.widget.EditText
+import android.widget.FrameLayout
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
@@ -45,8 +50,41 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         toggle = findViewById(R.id.toggle)
         toggle.setOnClickListener {
-            if (CaptureService.isRunning) stopCapture() else startCapture()
+            if (CaptureService.isRunning) stopCapture() else ensureNameThenStart()
         }
+    }
+
+    /** On first use, ask for a device name so screenshots are identifiable, then start. */
+    private fun ensureNameThenStart() {
+        val sp = getSharedPreferences("shottel", Context.MODE_PRIVATE)
+        val existing = sp.getString("deviceName", "") ?: ""
+        if (existing.isNotBlank()) {
+            startCapture()
+            return
+        }
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
+            hint = "e.g. Shop counter phone"
+        }
+        val container = FrameLayout(this).apply {
+            val pad = (20 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad / 2, pad, 0)
+            addView(input)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Name this device")
+            .setMessage("Shown with every screenshot so you can tell devices apart.")
+            .setView(container)
+            .setCancelable(false)
+            .setPositiveButton("Save") { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isNotBlank()) {
+                    sp.edit().putString("deviceName", name).apply()
+                    startCapture()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     override fun onResume() {
