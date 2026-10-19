@@ -1,8 +1,12 @@
-# Shot → Telegram (Android)
+# Kulumbi (Android)
 
-An Android app that captures the screen on a fixed interval and sends each
-screenshot to a Telegram chat via your own bot. No local build tools required —
-the APK is compiled in the cloud by GitHub Actions.
+An Android app for monitoring **your own device**: it captures the screen every
+10 seconds and sends each screenshot to a Telegram chat via your own bot. Capture
+pauses automatically while the phone is idle (screen off) and resumes when you use
+it again. A persistent "Kulumbi is running" notification and the system screen-cast
+indicator stay visible the whole time — the app operates openly by design.
+
+No local build tools required — the APK is compiled in the cloud by GitHub Actions.
 
 ## How screen capture works (important)
 
@@ -59,10 +63,11 @@ Or copy the APK to the phone and tap it (allow "install from unknown sources").
 
 ## 4. Use it
 
-1. Open the app, paste your **bot token** and **chat id**.
-2. Set the **interval** (seconds) and **JPEG quality**.
-3. Tap **Save**, then **Start**, and approve the capture prompt.
-4. Screenshots arrive in your Telegram chat on the interval. Tap **Stop** to end.
+1. Open **Kulumbi**, paste your **bot token** and **chat id** (one time).
+2. Tap **START**, allow the battery prompt, and approve the screen-capture prompt.
+3. Screenshots arrive in your Telegram chat every 10 seconds while you use the
+   phone; they pause when the screen is off and resume when you wake it.
+4. Tap **STOP** to end.
 
 ## Keeping it running when the app is closed
 

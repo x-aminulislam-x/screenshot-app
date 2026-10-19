@@ -18,6 +18,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.WindowManager
@@ -32,8 +33,9 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Foreground service that holds a MediaProjection session and, on a fixed interval,
- * captures one screen frame and uploads it to Telegram.
+ * Foreground service that, every [Prefs.INTERVAL_SECONDS] seconds, captures one screen
+ * frame and uploads it to Telegram. Capture pauses automatically while the device is
+ * idle (screen off / not interactive) and resumes when the user is active again.
  */
 class CaptureService : Service() {
 
@@ -53,6 +55,7 @@ class CaptureService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var prefs: Prefs
+    private lateinit var powerManager: PowerManager
 
     private var projection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
@@ -67,8 +70,13 @@ class CaptureService : Service() {
     private val tickHandler = Handler(android.os.Looper.getMainLooper())
     private val tickRunnable = object : Runnable {
         override fun run() {
-            captureAndSend()
-            tickHandler.postDelayed(this, prefs.intervalSeconds * 1000L)
+            if (powerManager.isInteractive) {
+                captureAndSend()
+            } else {
+                // Device is idle — pause (skip this tick) until the user is active again.
+                updateNotification("Kulumbi is running • paused (device idle)")
+            }
+            tickHandler.postDelayed(this, Prefs.INTERVAL_SECONDS * 1000L)
         }
     }
 
@@ -77,6 +85,7 @@ class CaptureService : Service() {
     override fun onCreate() {
         super.onCreate()
         prefs = Prefs(this)
+        powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         createChannel()
     }
 
@@ -88,9 +97,8 @@ class CaptureService : Service() {
             }
             ACTION_START -> startCapture(intent)
             else -> {
-                // Restarted by the system after a kill (START_STICKY redelivers a null
-                // intent). The MediaProjection grant cannot be restored silently, so we
-                // stay in the foreground and ask the user to tap to resume.
+                // Restarted by the system after a kill; the capture grant cannot be
+                // restored silently, so stay foreground and ask the user to resume.
                 startForeground(NOTIF_ID, buildResumeNotification())
             }
         }
@@ -98,14 +106,13 @@ class CaptureService : Service() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // User swiped the app from Recents. Keep the capture service alive instead of
-        // letting the task removal tear it down.
+        // User swiped the app from Recents — keep capturing.
         super.onTaskRemoved(rootIntent)
     }
 
     private fun startCapture(intent: Intent) {
-        // Must be in the foreground (with mediaProjection type) BEFORE obtaining the projection.
-        startForeground(NOTIF_ID, buildNotification("Starting…"))
+        // Must be foreground (mediaProjection type) BEFORE obtaining the projection.
+        startForeground(NOTIF_ID, buildNotification("Kulumbi is running"))
 
         val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, Int.MIN_VALUE)
         val data: Intent? = if (Build.VERSION.SDK_INT >= 33) {
@@ -138,8 +145,6 @@ class CaptureService : Service() {
         setupVirtualDisplay()
 
         isRunning = true
-        updateNotification("Running • every ${prefs.intervalSeconds}s")
-        // First shot immediately, then on interval.
         tickHandler.post(tickRunnable)
     }
 
@@ -159,7 +164,7 @@ class CaptureService : Service() {
 
         imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
         virtualDisplay = projection?.createVirtualDisplay(
-            "shottel",
+            "kulumbi",
             width, height, density,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
             imageReader!!.surface,
@@ -176,7 +181,7 @@ class CaptureService : Service() {
                 return@post
             }
             val baos = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, prefs.jpegQuality, baos)
+            bitmap.compress(Bitmap.CompressFormat.JPEG, Prefs.JPEG_QUALITY, baos)
             bitmap.recycle()
             val bytes = baos.toByteArray()
 
@@ -184,8 +189,8 @@ class CaptureService : Service() {
             scope.launch {
                 val err = Telegram.sendPhoto(prefs.botToken, prefs.chatId, "Screenshot $stamp", bytes)
                 tickHandler.post {
-                    if (err == null) updateNotification("Last sent $stamp")
-                    else updateNotification("Send failed: $err")
+                    if (err == null) updateNotification("Kulumbi is running • last sent $stamp")
+                    else updateNotification("Kulumbi is running • send failed")
                 }
             }
         }
@@ -206,7 +211,6 @@ class CaptureService : Service() {
                 Bitmap.Config.ARGB_8888
             )
             bmp.copyPixelsFromBuffer(buffer)
-            // Crop off the row padding if present.
             if (rowPadding == 0) bmp else Bitmap.createBitmap(bmp, 0, 0, width, height)
         } catch (e: Exception) {
             Log.e(TAG, "grabBitmap failed", e)
@@ -243,14 +247,14 @@ class CaptureService : Service() {
     private fun createChannel() {
         val nm = getSystemService(NotificationManager::class.java)
         val ch = NotificationChannel(
-            CHANNEL_ID, "Screen capture", NotificationManager.IMPORTANCE_LOW
-        ).apply { description = "Ongoing screenshot capture" }
+            CHANNEL_ID, "Kulumbi", NotificationManager.IMPORTANCE_LOW
+        ).apply { description = "Screen capture status" }
         nm.createNotificationChannel(ch)
     }
 
     private fun buildNotification(text: String): Notification {
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("Screenshot → Telegram")
+            .setContentTitle("Kulumbi")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .setOngoing(true)
@@ -272,7 +276,7 @@ class CaptureService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("Screenshot → Telegram")
+            .setContentTitle("Kulumbi")
             .setContentText("Capture was interrupted. Tap to resume.")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .setContentIntent(pi)

@@ -32,14 +32,14 @@ class MainActivity : AppCompatActivity() {
                     putExtra(CaptureService.EXTRA_RESULT_DATA, result.data)
                 }
                 ContextCompat.startForegroundService(this, svc)
-                status.text = "Capturing. You can leave the app open in the background."
+                status.text = "Running. Captures every 10s while you use the phone."
             } else {
                 status.text = "Screen-capture permission was declined."
             }
         }
 
     private val notifPermLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* ignore result */ }
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,32 +48,16 @@ class MainActivity : AppCompatActivity() {
 
         val token = findViewById<EditText>(R.id.token)
         val chat = findViewById<EditText>(R.id.chat)
-        val interval = findViewById<EditText>(R.id.interval)
-        val quality = findViewById<EditText>(R.id.quality)
-        val save = findViewById<Button>(R.id.save)
         val start = findViewById<Button>(R.id.start)
         val stop = findViewById<Button>(R.id.stop)
         status = findViewById(R.id.status)
 
         token.setText(prefs.botToken)
         chat.setText(prefs.chatId)
-        interval.setText(prefs.intervalSeconds.toString())
-        quality.setText(prefs.jpegQuality.toString())
-
-        save.setOnClickListener {
-            prefs.botToken = token.text.toString()
-            prefs.chatId = chat.text.toString()
-            prefs.intervalSeconds = interval.text.toString().toIntOrNull() ?: 300
-            prefs.jpegQuality = quality.text.toString().toIntOrNull() ?: 70
-            Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show()
-        }
 
         start.setOnClickListener {
             prefs.botToken = token.text.toString()
             prefs.chatId = chat.text.toString()
-            prefs.intervalSeconds = interval.text.toString().toIntOrNull() ?: 300
-            prefs.jpegQuality = quality.text.toString().toIntOrNull() ?: 70
-
             if (!prefs.isConfigured) {
                 Toast.makeText(this, "Enter bot token and chat id first", Toast.LENGTH_LONG).show()
                 return@setOnClickListener
@@ -85,10 +69,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         stop.setOnClickListener {
-            val svc = Intent(this, CaptureService::class.java).apply {
+            startService(Intent(this, CaptureService::class.java).apply {
                 action = CaptureService.ACTION_STOP
-            }
-            startService(svc)
+            })
             status.text = "Stopped."
         }
     }
@@ -103,7 +86,6 @@ class MainActivity : AppCompatActivity() {
                         .setData(Uri.parse("package:$packageName"))
                 )
             } catch (_: Exception) {
-                // Some OEMs block this intent; the user can set it manually in Settings.
             }
         }
     }
