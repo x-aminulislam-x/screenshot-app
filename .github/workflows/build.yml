@@ -23,8 +23,15 @@ jobs:
           gradle-version: '8.7'
 
       - name: Restore signing keystore
-        if: ${{ secrets.KEYSTORE_B64 != '' }}
-        run: echo "${{ secrets.KEYSTORE_B64 }}" | base64 -d > app/kulumbi.p12
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > app/kulumbi.p12
+            echo "Keystore restored."
+          else
+            echo "No KEYSTORE_B64 secret set; building with default debug key."
+          fi
 
       - name: Build debug APK
         env:
